@@ -2,13 +2,14 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>YouTube Shorts TikTok風 (音声あり)</title>
+  <title>YouTube Shorts TikTok風 (音声あり・常時ボタン)</title>
   <style>
     body, html {
       margin: 0;
       padding: 0;
       overflow: hidden;
       background: #000;
+      font-family: sans-serif;
     }
 
     #video-container {
@@ -30,39 +31,45 @@
       height: 640px;
     }
 
-    #start-btn {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      padding: 20px 40px;
-      font-size: 20px;
+    /* 音声ボタンを右下に常時表示 */
+    #audio-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 8px 12px;
+      font-size: 14px;
       cursor: pointer;
       background: #ff0000;
       color: #fff;
       border: none;
-      border-radius: 10px;
+      border-radius: 6px;
+      opacity: 0.8;
+      z-index: 1000;
+    }
+
+    #audio-btn:hover {
+      opacity: 1;
     }
   </style>
 </head>
 <body>
 
-<button id="start-btn">タップして再生開始（音声あり）</button>
 <div id="video-container"></div>
+<button id="audio-btn">🔊 音声ON</button>
 
 <!-- YouTube Iframe API -->
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
-const API_KEY = "AIzaSyDxg4ziMu2rbUG8wKR5z9qUfQX_l4iv-Uk";
+const API_KEY = "YOUR_API_KEY";
 let players = [];
 let videoIds = [];
 let currentIndex = 0;
 
-// YouTube APIで日本系ショート動画を取得
+// 日本系ショート動画を取得
 async function fetchShorts(maxResults = 10) {
   const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=ショート動画&type=video&videoDuration=short&maxResults=${maxResults}&regionCode=JP&relevanceLanguage=ja&key=${API_KEY}`
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=shorts&type=video&videoDuration=short&maxResults=${maxResults}&regionCode=JP&relevanceLanguage=ja&key=${API_KEY}`
   );
   const data = await res.json();
 
@@ -79,7 +86,7 @@ function shuffle(arr) {
   return arr.sort(() => Math.random() - 0.5);
 }
 
-// DOMに動画プレイヤー追加
+// DOMにプレイヤー追加
 function renderVideos() {
   const container = document.getElementById("video-container");
   container.innerHTML = "";
@@ -91,7 +98,7 @@ function renderVideos() {
   });
 }
 
-// YouTube Iframe API準備完了後に呼ばれる
+// Iframe API準備完了
 function onYouTubeIframeAPIReady() {
   fetchShorts();
 }
@@ -110,8 +117,8 @@ function loadPlayers() {
       },
       events: {
         'onReady': (event) => {
-          event.target.mute(); // 最初はミュート（ブラウザ制限対策）
-          if (index === 0) event.target.playVideo(); // 最初の動画だけ再生
+          event.target.mute(); // 最初はミュート
+          if (index === 0) event.target.playVideo(); // 最初の動画再生
         }
       }
     });
@@ -128,17 +135,17 @@ document.getElementById("video-container").addEventListener("scroll", () => {
     players[index].playVideo();
     currentIndex = index;
 
-    if (index >= videoIds.length - 3) fetchShorts(5); // 無限スクロール
+    // 無限スクロール
+    if (index >= videoIds.length - 3) fetchShorts(5);
   }
 });
 
-// 音声を有効化するためのボタン
-document.getElementById("start-btn").addEventListener("click", () => {
-  players.forEach(player => player.unMute()); // ミュート解除
-  players[0].playVideo(); // 最初の動画再生
-  document.getElementById("start-btn").style.display = "none"; // ボタン消す
+// 音声有効化ボタン
+document.getElementById("audio-btn").addEventListener("click", () => {
+  players.forEach(player => player.unMute()); // 全動画ミュート解除
+  players[currentIndex]?.playVideo(); // 現在動画再生
 });
-
 </script>
+
 </body>
 </html>
