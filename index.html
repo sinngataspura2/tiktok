@@ -9,31 +9,25 @@
       padding: 0;
       overflow: hidden;
       background: #000;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
     }
+
     #video-container {
-      width: 100%;
       height: 100vh;
-      scroll-snap-type: y mandatory;
       overflow-y: scroll;
+      scroll-snap-type: y mandatory;
     }
-    .short-video {
-      width: 100%;
+
+    .video {
       height: 100vh;
-      scroll-snap-align: start;
       display: flex;
-      align-items: center;
       justify-content: center;
-      background: #000;
+      align-items: center;
+      scroll-snap-align: start;
     }
-    iframe {
+
+    .player {
       width: 360px;
       height: 640px;
-      border: none;
     }
   </style>
 </head>
@@ -41,57 +35,116 @@
 
 <div id="video-container"></div>
 
+<!-- YouTube Iframe API -->
+<script src="https://www.youtube.com/iframe_api"></script>
+
 <script>
-const API_KEY = "AIzaSyDxg4ziMu2rbUG8wKR5z9qUfQX_l4iv-Uk"; // ここにAPIキー
-const MAX_VIDEOS = 20; // 一度に取得する動画数
-let videoList = [];
+const API_KEY = "YOUR_API_KEY";
+let players = [];
+let videoIds = [];
 let currentIndex = 0;
 
-// YouTube APIでショート動画を取得
+// Shorts取得
 async function fetchShorts() {
   const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=shorts&type=video&videoDuration=short&maxResults=${MAX_VIDEOS}&key=${API_KEY}`
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=shorts&type=video&videoDuration=short&maxResults=10&key=${API_KEY}`
   );
   const data = await res.json();
-  videoList = data.items.map(item => `https://www.youtube.com/embed/${item.id.videoId}?autoplay=1&controls=0&loop=1&playlist=${item.id.videoId}`);
-  shuffleArray(videoList); // ランダム順に
-  renderVideos();
+
+  videoIds = data.items.map(item => item.id.videoId);
+  shuffle(videoIds);
+  createPlayers();
 }
 
-// 配列をランダムに並び替え
-function shuffleArray(array) {
-  for (let i = array.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [array[i], array[j]] = [array[j], array[i]];
-  }
+// シャッフル
+function shuffle(arr) {
+  return arr.sort(() => Math.random() - 0.5);
 }
 
-// 動画をDOMに追加
-function renderVideos() {
+// プレイヤー作成
+function createPlayers() {
   const container = document.getElementById("video-container");
   container.innerHTML = "";
-  videoList.forEach(src => {
+
+  videoIds.forEach((id, index) => {
     const div = document.createElement("div");
-    div.className = "short-video";
-    div.innerHTML = `<iframe src="${src}" allow="autoplay; fullscreen"></iframe>`;
+    div.className = "video";
+    div.innerHTML = `<div id="player-${index}" class="player"></div>`;
     container.appendChild(div);
   });
 }
 
-// スクロールで次の動画に自動フォーカス
+// API準備完了後に呼ばれる
+function onYouTubeIframeAPIReady() {
+  fetchShorts();
+}
+
+// プレイヤー生成
+function loadPlayers() {
+  players = videoIds.map((id, index) => {
+    return new YT.Player(`player-${index}`, {
+      videoId: id,
+      playerVars: {
+        autoplay: 0,
+        controls: 0,
+        modestbranding: 1,
+        loop: 1,
+        playlist: id
+      }
+    });
+  });
+
+  // 最初の動画だけ再生
+  setTimeout(() => {
+    players[0].playVideo();
+  }, 1000);
+}
+
+// DOM更新後にプレイヤー作る
+const observer = new MutationObserver(() => {
+  if (videoIds.length && document.querySelectorAll(".player").length) {
+    loadPlayers();
+    observer.disconnect();
+  }
+});
+observer.observe(document.getElementById("video-container"), { childList: true });
+
+// スクロール制御
 document.getElementById("video-container").addEventListener("scroll", () => {
   const container = document.getElementById("video-container");
-  const scrollTop = container.scrollTop;
-  const height = window.innerHeight;
-  const index = Math.round(scrollTop / height);
-  if (index !== currentIndex) {
+  const index = Math.round(container.scrollTop / window.innerHeight);
+
+  if (index !== currentIndex && players[index]) {
+    // 前の動画停止
+    if (players[currentIndex]) {
+      players[currentIndex].pauseVideo();
+    }
+
+    // 新しい動画再生
+    players[index].playVideo();
     currentIndex = index;
-    // ここで必要なら動画の再生・停止を制御可能
+
+    // 無限スクロール（最後で追加）
+    if (index === videoIds.length - 1) {
+      fetchMore();
+    }
   }
 });
 
-// 初期ロード
-fetchShorts();
+// 追加ロード（無限スクロール）
+async function fetchMore() {
+  const res = await fetch(
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=shorts&type=video&videoDuration=short&maxResults=5&key=${API_KEY}`
+  );
+  const data = await res.json();
+
+  const newIds = data.items.map(item => item.id.videoId);
+  videoIds = videoIds.concat(newIds);
+
+  createPlayers();
+  loadPlayers();
+}
 </script>
+
 </body>
 </html>
