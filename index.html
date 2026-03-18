@@ -1,55 +1,54 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>YouTube Shorts TikTok風 (音声トグル・重複排除)</title>
-  <style>
-    body, html {
-      margin: 0;
-      padding: 0;
-      overflow: hidden;
-      background: #000;
-      font-family: sans-serif;
-    }
+<meta charset="UTF-8">
+<title>YouTube Shorts TikTok風 (音声トグル + 完全表示再生)</title>
+<style>
+  body, html {
+    margin:0;
+    padding:0;
+    overflow:hidden;
+    background:#000;
+    font-family:sans-serif;
+  }
 
-    #video-container {
-      height: 100vh;
-      overflow-y: scroll;
-      scroll-snap-type: y mandatory;
-    }
+  #video-container {
+    height:100vh;
+    overflow-y:scroll;
+    scroll-snap-type:y mandatory;
+  }
 
-    .video {
-      height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      scroll-snap-align: start;
-    }
+  .video {
+    height:100vh;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    scroll-snap-align:start;
+  }
 
-    .player {
-      width: 360px;
-      height: 640px;
-    }
+  .player {
+    width:360px;
+    height:640px;
+  }
 
-    /* 右下スピーカーアイコン */
-    #audio-btn {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      width: 40px;
-      height: 40px;
-      font-size: 20px;
-      cursor: pointer;
-      background: rgba(255,0,0,0.8);
-      color: #fff;
-      border: none;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
-  </style>
+  #audio-btn {
+    position:fixed;
+    bottom:20px;
+    right:20px;
+    width:40px;
+    height:40px;
+    font-size:20px;
+    cursor:pointer;
+    background:rgba(255,0,0,0.8);
+    color:#fff;
+    border:none;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:1000;
+  }
+</style>
 </head>
 <body>
 
@@ -57,29 +56,26 @@
 <button id="audio-btn">🔇</button>
 
 <script src="https://www.youtube.com/iframe_api"></script>
-
 <script>
-const API_KEY = "AIzaSyDxg4ziMu2rbUG8wKR5z9qUfQX_l4iv-Uk";
+const API_KEY = "YOUR_API_KEY";
 let players = [];
 let videoIds = [];
-let currentIndex = 0;
-let playedIds = new Set(); // 再生済みID保持
+let currentIndex = -1;
+let playedIds = new Set();
 let isMuted = true;
 
-// 日本系ショート動画を取得（重複排除）
-async function fetchShorts(maxResults = 10) {
+// 日本系ショート動画取得（重複排除）
+async function fetchShorts(maxResults=10) {
   const res = await fetch(
     `https://www.googleapis.com/youtube/v3/search?part=snippet&q=ショート動画&type=video&videoDuration=short&maxResults=${maxResults}&regionCode=JP&relevanceLanguage=ja&key=${API_KEY}`
   );
   const data = await res.json();
-
   const newIds = data.items
     .map(item => item.id.videoId)
-    .filter(id => !playedIds.has(id)); // 重複排除
-
-  videoIds = videoIds.concat(newIds);
+    .filter(id => !playedIds.has(id));
+  if (newIds.length === 0) return;
   newIds.forEach(id => playedIds.add(id));
-
+  videoIds = videoIds.concat(newIds);
   shuffle(videoIds);
   renderVideos();
   loadPlayers();
@@ -90,14 +86,14 @@ function shuffle(arr) {
   return arr.sort(() => Math.random() - 0.5);
 }
 
-// DOMにプレイヤー追加
+// DOMにプレイヤー作成
 function renderVideos() {
   const container = document.getElementById("video-container");
   container.innerHTML = "";
-  videoIds.forEach((id, index) => {
-    const div = document.createElement("div");
-    div.className = "video";
-    div.innerHTML = `<div id="player-${index}" class="player"></div>`;
+  videoIds.forEach((id,index)=>{
+    const div=document.createElement("div");
+    div.className="video";
+    div.innerHTML=`<div id="player-${index}" class="player"></div>`;
     container.appendChild(div);
   });
 }
@@ -109,52 +105,63 @@ function onYouTubeIframeAPIReady() {
 
 // プレイヤー生成
 function loadPlayers() {
-  players = videoIds.map((id, index) => {
-    return new YT.Player(`player-${index}`, {
-      videoId: id,
-      playerVars: {
-        autoplay: 1,
-        controls: 0,
-        modestbranding: 1,
-        loop: 1,
-        playlist: id
+  players = videoIds.map((id,index)=>{
+    return new YT.Player(`player-${index}`,{
+      videoId:id,
+      playerVars:{
+        autoplay:1,
+        controls:0,
+        modestbranding:1,
+        loop:1,
+        playlist:id
       },
-      events: {
-        'onReady': (event) => {
-          if (isMuted) event.target.mute();
+      events:{
+        'onReady':(event)=>{
+          if(isMuted) event.target.mute();
           else event.target.unMute();
-          if (index === 0) event.target.playVideo();
         }
       }
     });
   });
+
+  // IntersectionObserverで完全表示された動画だけ再生
+  const observer = new IntersectionObserver((entries)=>{
+    entries.forEach(entry=>{
+      const idx = parseInt(entry.target.querySelector('.player').id.split('-')[1]);
+      if(entry.isIntersecting && entry.intersectionRatio >= 0.9){
+        // 前の動画停止
+        if(currentIndex !== -1 && players[currentIndex] && currentIndex !== idx){
+          players[currentIndex].pauseVideo();
+        }
+        currentIndex = idx;
+        // 音声状態に応じて再生
+        if(players[idx]){
+          if(isMuted) players[idx].mute();
+          else players[idx].unMute();
+          players[idx].playVideo();
+        }
+        // 無限スクロールで追加
+        if(idx >= videoIds.length-3){
+          fetchShorts(5);
+        }
+      }
+    });
+  },{
+    threshold:0.9
+  });
+
+  document.querySelectorAll('.video').forEach(div=>observer.observe(div));
 }
-
-// スクロールで動画切替
-document.getElementById("video-container").addEventListener("scroll", () => {
-  const container = document.getElementById("video-container");
-  const index = Math.round(container.scrollTop / window.innerHeight);
-
-  if (index !== currentIndex && players[index]) {
-    if (players[currentIndex]) players[currentIndex].pauseVideo();
-    players[index].playVideo();
-    currentIndex = index;
-
-    // 無限スクロール
-    if (index >= videoIds.length - 3) fetchShorts(5);
-  }
-});
 
 // 音声トグルボタン
 const audioBtn = document.getElementById("audio-btn");
-audioBtn.addEventListener("click", () => {
+audioBtn.addEventListener("click",()=>{
   isMuted = !isMuted;
-  players.forEach(player => {
-    if (isMuted) player.mute();
-    else player.unMute();
-  });
-  // アイコン切替
   audioBtn.textContent = isMuted ? "🔇" : "🔊";
+  if(currentIndex!==-1 && players[currentIndex]){
+    if(isMuted) players[currentIndex].mute();
+    else players[currentIndex].unMute();
+  }
 });
 </script>
 </body>
