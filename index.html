@@ -2,13 +2,34 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>動画再生</title>
+  <title>YouTube Shorts Fetch</title>
 </head>
 <body>
+  <h1>Shorts動画取得</h1>
+  <button onclick="fetchShorts()">取得</button>
+  <ul id="list"></ul>
 
-  <video src="https://tiktokio.net/download/wwm/NmpZTFUrWXozWDc0a1JxcjJDM214dkVORWgvRitFTm9raU43aE9QakJzST0=/ZVZ1MVdxQUQzRXhZS0x5ZnIvMlRLZFhhL2ZHSUlPWlpYTmtLZ25UemVjMXpqUWIrOGt1VDZWRklVdzJUS1h0Wkx4NG5OS0xRV200UGhMVFZmYThEQ0k5RjFTRS9MQlNHMW11VGY1Q0lwOWcwM2JUVldlVUVrWHl0Z3hVbWtsNW1hclVSS2owT25nd3ZXbkgzMHhQdkgxZ2E5bzY1b25ueFhueGxJN3BtUzEvWHFmcG82Njhpb3MyeXRwS083MHdUSHd1OUFJTUZRM3FwMkExSGU0Wk5MeHJPVkRGYUdWakpjV25YbVdUek00Nk1mVWVMR096SnJaM2M0QU5wMDZHZXdaZzd3WjFCcmZIRFFXTXJQSnJHQzdBckV6Sk0xdzJCM1lyWTJqMHJNdUs5UW9LQkNKWTYzN1RHT0ZiTUdDOFl6UnIvUXZzNVVpWG9xVk81SHNTTmkxWkJzS1cxekgzaU5RRlNxM0xnZEVvQnI1RTluSmd0bHd3UmJxWndld3ZhQkVqMFk4UnE4dmxTcTZDTWNqQ0xGMkYwR0U2NE9ROS9RVjJjaDZ3TG0zTzBYeWxtT3IzRGUvWlRLdy9mTDZOYlFLeU5mMEc5SUV1blhETk9EOTFSdEtFQjd1M3hRaXJJN01GUksxSzdqYW5NUDFVMkJIa0ZuRmRmcHRnMDQyTlpwMWRxTTIyWjVxQjJJWW5kSG5HcXJKM3cyblBxUGF6WFRwbjJyRXg0VldJeDh2Tm14YjFHNVRFUjNZb0kwYU9BWGdNZndpNXFGaGJtempsVTlaNHZxRG1Sb0RzT0FRS0hTdVVoWVNueHdHZWtxZEdPeUszclczd3UvYmM5UUs2ZnpuK1hYVHIyYzBJemkxeC80T3BLR3c9PQ==/" controls width="640">
-    お使いのブラウザは動画タグに対応していません。
-  </video>
+  <script>
+    const API_KEY = "YOUR_API_KEY";
 
+    async function fetchShorts() {
+      const res = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=shorts&type=video&videoDuration=short&maxResults=10&key=${API_KEY}`
+      );
+      const data = await res.json();
+
+      const list = document.getElementById("list");
+      list.innerHTML = "";
+
+      data.items.forEach(item => {
+        const videoId = item.id.videoId;
+        const url = `https://www.youtube.com/shorts/${videoId}`;
+
+        const li = document.createElement("li");
+        li.innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
+        list.appendChild(li);
+      });
+    }
+  </script>
 </body>
 </html>
