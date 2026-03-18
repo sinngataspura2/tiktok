@@ -62,7 +62,7 @@ let currentIndex = 0;
 // YouTube APIで日本系ショート動画を取得
 async function fetchShorts(maxResults = 10) {
   const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=shorts&type=video&videoDuration=short&maxResults=${maxResults}&regionCode=ショート動画=ja&key=${API_KEY}`
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=ショート動画&type=video&videoDuration=short&maxResults=${maxResults}&regionCode=JP&relevanceLanguage=ja&key=${API_KEY}`
   );
   const data = await res.json();
 
