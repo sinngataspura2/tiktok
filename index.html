@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>YouTube Shorts TikTok風 (音声あり・常時ボタン)</title>
+  <title>YouTube Shorts TikTok風 (音声トグル・重複排除)</title>
   <style>
     body, html {
       margin: 0;
@@ -31,33 +31,31 @@
       height: 640px;
     }
 
-    /* 音声ボタンを右下に常時表示 */
+    /* 右下スピーカーアイコン */
     #audio-btn {
       position: fixed;
       bottom: 20px;
       right: 20px;
-      padding: 8px 12px;
-      font-size: 14px;
+      width: 40px;
+      height: 40px;
+      font-size: 20px;
       cursor: pointer;
-      background: #ff0000;
+      background: rgba(255,0,0,0.8);
       color: #fff;
       border: none;
-      border-radius: 6px;
-      opacity: 0.8;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       z-index: 1000;
-    }
-
-    #audio-btn:hover {
-      opacity: 1;
     }
   </style>
 </head>
 <body>
 
 <div id="video-container"></div>
-<button id="audio-btn">🔊 音声ON</button>
+<button id="audio-btn">🔇</button>
 
-<!-- YouTube Iframe API -->
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
@@ -65,18 +63,24 @@ const API_KEY = "YOUR_API_KEY";
 let players = [];
 let videoIds = [];
 let currentIndex = 0;
+let playedIds = new Set(); // 再生済みID保持
+let isMuted = true;
 
-// 日本系ショート動画を取得
+// 日本系ショート動画を取得（重複排除）
 async function fetchShorts(maxResults = 10) {
   const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=shorts&type=video&videoDuration=short&maxResults=${maxResults}&regionCode=JP&relevanceLanguage=ja&key=${API_KEY}`
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=ショート動画&type=video&videoDuration=short&maxResults=${maxResults}&regionCode=JP&relevanceLanguage=ja&key=${API_KEY}`
   );
   const data = await res.json();
 
-  const newIds = data.items.map(item => item.id.videoId);
-  videoIds = videoIds.concat(newIds);
-  shuffle(videoIds);
+  const newIds = data.items
+    .map(item => item.id.videoId)
+    .filter(id => !playedIds.has(id)); // 重複排除
 
+  videoIds = videoIds.concat(newIds);
+  newIds.forEach(id => playedIds.add(id));
+
+  shuffle(videoIds);
   renderVideos();
   loadPlayers();
 }
@@ -117,8 +121,9 @@ function loadPlayers() {
       },
       events: {
         'onReady': (event) => {
-          event.target.mute(); // 最初はミュート
-          if (index === 0) event.target.playVideo(); // 最初の動画再生
+          if (isMuted) event.target.mute();
+          else event.target.unMute();
+          if (index === 0) event.target.playVideo();
         }
       }
     });
@@ -140,12 +145,17 @@ document.getElementById("video-container").addEventListener("scroll", () => {
   }
 });
 
-// 音声有効化ボタン
-document.getElementById("audio-btn").addEventListener("click", () => {
-  players.forEach(player => player.unMute()); // 全動画ミュート解除
-  players[currentIndex]?.playVideo(); // 現在動画再生
+// 音声トグルボタン
+const audioBtn = document.getElementById("audio-btn");
+audioBtn.addEventListener("click", () => {
+  isMuted = !isMuted;
+  players.forEach(player => {
+    if (isMuted) player.mute();
+    else player.unMute();
+  });
+  // アイコン切替
+  audioBtn.textContent = isMuted ? "🔇" : "🔊";
 });
 </script>
-
 </body>
 </html>
