@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>YouTube Shorts </title>
+  <title>YouTube Shorts TikTok風 (日本版)</title>
   <style>
     body, html {
       margin: 0;
@@ -39,33 +39,35 @@
 <script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
-const API_KEY = "AIzaSyDxg4ziMu2rbUG8wKR5z9qUfQX_l4iv-Uk";
+const API_KEY = "YOUR_API_KEY"; // ←ここに自分のAPIキー
 let players = [];
 let videoIds = [];
 let currentIndex = 0;
 
-// Shorts取得
-async function fetchShorts() {
+// YouTube APIで日本系ショート動画を取得
+async function fetchShorts(maxResults = 10) {
   const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=shorts&type=video&videoDuration=short&maxResults=10&key=${API_KEY}`
+    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=shorts&type=video&videoDuration=short&maxResults=${maxResults}&regionCode=JP&relevanceLanguage=ja&key=${API_KEY}`
   );
   const data = await res.json();
 
-  videoIds = data.items.map(item => item.id.videoId);
+  const newIds = data.items.map(item => item.id.videoId);
+  videoIds = videoIds.concat(newIds);
   shuffle(videoIds);
-  createPlayers();
+
+  renderVideos();
+  loadPlayers();
 }
 
-// シャッフル
+// 配列シャッフル
 function shuffle(arr) {
   return arr.sort(() => Math.random() - 0.5);
 }
 
-// プレイヤー作成
-function createPlayers() {
+// DOMに動画プレイヤー追加
+function renderVideos() {
   const container = document.getElementById("video-container");
   container.innerHTML = "";
-
   videoIds.forEach((id, index) => {
     const div = document.createElement("div");
     div.className = "video";
@@ -74,7 +76,7 @@ function createPlayers() {
   });
 }
 
-// API準備完了後に呼ばれる
+// YouTube Iframe API準備完了後に呼ばれる
 function onYouTubeIframeAPIReady() {
   fetchShorts();
 }
@@ -85,65 +87,38 @@ function loadPlayers() {
     return new YT.Player(`player-${index}`, {
       videoId: id,
       playerVars: {
-        autoplay: 0,
+        autoplay: 1,
         controls: 0,
         modestbranding: 1,
         loop: 1,
         playlist: id
+      },
+      events: {
+        'onReady': (event) => {
+          event.target.mute(); // 自動再生用にミュート
+          if (index === 0) event.target.playVideo(); // 最初の動画だけ再生
+        }
       }
     });
   });
-
-  // 最初の動画だけ再生
-  setTimeout(() => {
-    players[0].playVideo();
-  }, 1000);
 }
 
-// DOM更新後にプレイヤー作る
-const observer = new MutationObserver(() => {
-  if (videoIds.length && document.querySelectorAll(".player").length) {
-    loadPlayers();
-    observer.disconnect();
-  }
-});
-observer.observe(document.getElementById("video-container"), { childList: true });
-
-// スクロール制御
+// スクロールで動画切替
 document.getElementById("video-container").addEventListener("scroll", () => {
   const container = document.getElementById("video-container");
   const index = Math.round(container.scrollTop / window.innerHeight);
 
   if (index !== currentIndex && players[index]) {
-    // 前の動画停止
-    if (players[currentIndex]) {
-      players[currentIndex].pauseVideo();
-    }
-
-    // 新しい動画再生
+    if (players[currentIndex]) players[currentIndex].pauseVideo();
     players[index].playVideo();
     currentIndex = index;
 
-    // 無限スクロール（最後で追加）
-    if (index === videoIds.length - 1) {
-      fetchMore();
+    // 無限スクロールで追加取得
+    if (index >= videoIds.length - 3) {
+      fetchShorts(5); // 少しずつ追加
     }
   }
 });
-
-// 追加ロード（無限スクロール）
-async function fetchMore() {
-  const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?part=snippet&q=shorts&type=video&videoDuration=short&maxResults=5&key=${API_KEY}`
-  );
-  const data = await res.json();
-
-  const newIds = data.items.map(item => item.id.videoId);
-  videoIds = videoIds.concat(newIds);
-
-  createPlayers();
-  loadPlayers();
-}
 </script>
 
 </body>
