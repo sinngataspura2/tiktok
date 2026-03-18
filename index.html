@@ -2,51 +2,16 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>YouTube Shorts TikTok風 (音声トグル + 完全表示再生)</title>
+<title>YouTube Shorts TikTok風 (重複防止 + 音声トグル)</title>
 <style>
-  body, html {
-    margin:0;
-    padding:0;
-    overflow:hidden;
-    background:#000;
-    font-family:sans-serif;
-  }
-
-  #video-container {
-    height:100vh;
-    overflow-y:scroll;
-    scroll-snap-type:y mandatory;
-  }
-
-  .video {
-    height:100vh;
-    display:flex;
-    justify-content:center;
-    align-items:center;
-    scroll-snap-align:start;
-  }
-
-  .player {
-    width:360px;
-    height:640px;
-  }
-
+  body, html { margin:0; padding:0; overflow:hidden; background:#000; font-family:sans-serif;}
+  #video-container { height:100vh; overflow-y:scroll; scroll-snap-type:y mandatory;}
+  .video { height:100vh; display:flex; justify-content:center; align-items:center; scroll-snap-align:start;}
+  .player { width:360px; height:640px;}
   #audio-btn {
-    position:fixed;
-    bottom:20px;
-    right:20px;
-    width:40px;
-    height:40px;
-    font-size:20px;
-    cursor:pointer;
-    background:rgba(255,0,0,0.8);
-    color:#fff;
-    border:none;
-    border-radius:50%;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    z-index:1000;
+    position:fixed; bottom:20px; right:20px; width:40px; height:40px; font-size:20px;
+    cursor:pointer; background:rgba(255,0,0,0.8); color:#fff; border:none; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; z-index:1000;
   }
 </style>
 </head>
@@ -57,24 +22,32 @@
 
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
-const API_KEY = "AIzaSyDxg4ziMu2rbUG8wKR5z9qUfQX_l4iv-Uk";
+const API_KEY = "YOUR_API_KEY";
 let players = [];
 let videoIds = [];
 let currentIndex = -1;
-let playedIds = new Set();
 let isMuted = true;
 
+// localStorage から再生済みIDを取得
+let playedIds = new Set(JSON.parse(localStorage.getItem('playedIds') || "[]"));
+
 // 日本系ショート動画取得（重複排除）
-async function fetchShorts(maxResults=10) {
+async function fetchShorts(maxResults=10){
   const res = await fetch(
     `https://www.googleapis.com/youtube/v3/search?part=snippet&q=ショート動画&type=video&videoDuration=short&maxResults=${maxResults}&regionCode=JP&relevanceLanguage=ja&key=${API_KEY}`
   );
   const data = await res.json();
-  const newIds = data.items
-    .map(item => item.id.videoId)
-    .filter(id => !playedIds.has(id));
-  if (newIds.length === 0) return;
-  newIds.forEach(id => playedIds.add(id));
+
+  const newIds = data.items.map(item=>item.id.videoId)
+                     .filter(id=>!playedIds.has(id));
+  if(newIds.length===0) return;
+
+  newIds.forEach(id=>{
+    playedIds.add(id);
+  });
+  // localStorage 更新
+  localStorage.setItem('playedIds', JSON.stringify([...playedIds]));
+
   videoIds = videoIds.concat(newIds);
   shuffle(videoIds);
   renderVideos();
@@ -82,14 +55,12 @@ async function fetchShorts(maxResults=10) {
 }
 
 // 配列シャッフル
-function shuffle(arr) {
-  return arr.sort(() => Math.random() - 0.5);
-}
+function shuffle(arr){ return arr.sort(()=>Math.random()-0.5); }
 
-// DOMにプレイヤー作成
-function renderVideos() {
-  const container = document.getElementById("video-container");
-  container.innerHTML = "";
+// DOMにプレイヤー追加
+function renderVideos(){
+  const container=document.getElementById("video-container");
+  container.innerHTML="";
   videoIds.forEach((id,index)=>{
     const div=document.createElement("div");
     div.className="video";
@@ -99,65 +70,47 @@ function renderVideos() {
 }
 
 // Iframe API準備完了
-function onYouTubeIframeAPIReady() {
-  fetchShorts();
-}
+function onYouTubeIframeAPIReady(){ fetchShorts(); }
 
 // プレイヤー生成
-function loadPlayers() {
+function loadPlayers(){
   players = videoIds.map((id,index)=>{
     return new YT.Player(`player-${index}`,{
       videoId:id,
-      playerVars:{
-        autoplay:1,
-        controls:0,
-        modestbranding:1,
-        loop:1,
-        playlist:id
-      },
-      events:{
-        'onReady':(event)=>{
-          if(isMuted) event.target.mute();
-          else event.target.unMute();
-        }
-      }
+      playerVars:{ autoplay:1, controls:0, modestbranding:1, loop:1, playlist:id },
+      events:{ 'onReady':(event)=>{
+        if(isMuted) event.target.mute(); else event.target.unMute();
+      }}
     });
   });
 
-  // IntersectionObserverで完全表示された動画だけ再生
+  // IntersectionObserverで完全表示動画のみ再生
   const observer = new IntersectionObserver((entries)=>{
     entries.forEach(entry=>{
-      const idx = parseInt(entry.target.querySelector('.player').id.split('-')[1]);
-      if(entry.isIntersecting && entry.intersectionRatio >= 0.9){
+      const idx=parseInt(entry.target.querySelector('.player').id.split('-')[1]);
+      if(entry.isIntersecting && entry.intersectionRatio>=0.9){
         // 前の動画停止
-        if(currentIndex !== -1 && players[currentIndex] && currentIndex !== idx){
+        if(currentIndex!==-1 && players[currentIndex] && currentIndex!==idx){
           players[currentIndex].pauseVideo();
         }
-        currentIndex = idx;
-        // 音声状態に応じて再生
+        currentIndex=idx;
         if(players[idx]){
-          if(isMuted) players[idx].mute();
-          else players[idx].unMute();
+          if(isMuted) players[idx].mute(); else players[idx].unMute();
           players[idx].playVideo();
         }
-        // 無限スクロールで追加
-        if(idx >= videoIds.length-3){
-          fetchShorts(5);
-        }
+        if(idx>=videoIds.length-3) fetchShorts(5);
       }
     });
-  },{
-    threshold:0.9
-  });
+  },{threshold:0.9});
 
   document.querySelectorAll('.video').forEach(div=>observer.observe(div));
 }
 
-// 音声トグルボタン
-const audioBtn = document.getElementById("audio-btn");
+// 音声トグル
+const audioBtn=document.getElementById("audio-btn");
 audioBtn.addEventListener("click",()=>{
-  isMuted = !isMuted;
-  audioBtn.textContent = isMuted ? "🔇" : "🔊";
+  isMuted=!isMuted;
+  audioBtn.textContent=isMuted?"🔇":"🔊";
   if(currentIndex!==-1 && players[currentIndex]){
     if(isMuted) players[currentIndex].mute();
     else players[currentIndex].unMute();
